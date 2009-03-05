@@ -1,41 +1,31 @@
 require 'thread'
 
 class ThreadFactory
-  @@mutex = Mutex.new
+  @@computation_mutex = Mutex.new
   @@computation_map = {}
 
   def self.computation_map
     @@computation_map
   end
 
-  def self.create_file_writer_thread(name, options)
-    Thread.new do
-      Thread.stop
-      file = "/tmp/blah.txt"
+  def self.create_computation_thread(mutex, cv, options)
+    Thread.new(options[:run_seconds], @@computation_map) do |run_seconds, map|
+      mutex.synchronize {
+        cv.wait(mutex)
+        # Report in order how the threads were executed
+        puts "Running #{Thread.current[:name]}..."
+      }
 
-      File.delete(file) if File.exists?(file)
-      File.open file, "w" do |f|
-        while Time.now.to_i < options[:run_until] do
-          f << '.' * options[:buffer_size]
-        end
-      end
-    end
-  end
-
-  def self.create_computation_thread(name, options)
-    Thread.new(name, options[:run_seconds], @@computation_map) do |n, run_seconds, map|
-      Thread.current[:name] = n
-      Thread.stop
-     
       run_until = Time.now.to_f + run_seconds.to_f
 
       i = 0
       while Time.now.to_f < run_until
         i += 1
       end
-      @@mutex.synchronize do
+
+      @@computation_mutex.synchronize {
         map[Thread.current[:name]] = i
-      end
+      }
     end
   end
 
@@ -47,11 +37,11 @@ class ThreadFactory
     "#{type}#{@@thread_map[type]}"
   end
 
-  def self.create(type_sym, args)
+  def self.create(type_sym, mutex, cv, args)
     thread_name = create_thread_name(type_sym)
-    thread = self.send("create_#{type_sym}_thread", thread_name, args)
-    sleep 0.1
-    puts "Spawning #{type_sym.to_s} thread (#{thread_name})"
+    thread = self.send("create_#{type_sym}_thread", mutex, cv, args)
+    thread[:name] = thread_name
+    puts "Created #{type_sym.to_s} thread (#{thread_name})"
     thread
   end
 end

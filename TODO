@@ -1,0 +1,29 @@
+Benchmarking
+============
+Basic
+[ ] Add framework for creating repeatable tests in different configurations
+    [ ] Framework should be able to repeat tests on different OSes
+    [ ] Framework should be able to repeat tests on ruby versions
+    [ ] Framework should be able to repeat tests with different run times
+    [ ] Framework should be able to repeat tests using different threading models
+
+[ ] Add hooks for plotting results of different benchmarks
+    [ ] Benchmarks are repeatable
+    [ ] Benchmarks generate HTML pages with graphs
+
+Computation
+[ ] Run benchmarks against windows/ruby 1.8.7
+[ ] Run benchmarks against macosx/ruby 1.8.7
+[ ] Run benchmarks against windows/ruby 1.8.7
+[ ] Run benchmarks against macosx/ruby 1.9.1
+[ ] Run benchmarks against linux/ruby 1.8.7
+[ ] Run benchmarks against linux/ruby 1.9.1
+
+Threading models:
+=================
+[ ] Thread pool
+
+Threading models with I/O:
+==========================
+[ ] Asynch I/O with workers in thread pool
+
