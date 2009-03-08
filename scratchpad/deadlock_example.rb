@@ -13,7 +13,7 @@ b_cv = ConditionVariable.new
 
 t1 = Thread.new do
   b_mutex.synchronize {
-    puts "t1: in b"
+    puts "t1: in b"  
     puts "t1: trying to get a"
     a_mutex.synchronize {
       puts "t1: waiting on a"
@@ -39,7 +39,7 @@ end
 
 # Sleep here to demonstrate that the lock can't be broken
 # even if the main process waits for a while
-sleep 2
+# sleep 2
 
 t1.join
 t2.join

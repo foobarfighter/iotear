@@ -34,8 +34,11 @@ threads.each do |t|
   puts "About to run thread: #{t[:name]}..."
 end
 
+puts "Ready? Go!"
+# Is there a race condition here because a thread may not be waiting by the time we notify?
+# This command seems to produce a race condition sometimes
+# time ~/.multiruby/install/1.9.1-rc2/bin/ruby lots_of_threads.rb -c 1 -s 0.5
 mutex.synchronize {
-  puts "Ready? Go!"
   cv.broadcast
   puts "Waiting on all threads to finish"
 }

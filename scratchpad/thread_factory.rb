@@ -8,25 +8,38 @@ class ThreadFactory
     @@computation_map
   end
 
+  # This is a thread safe operation that is gauranteed to only return when the child thread is
+  # waiting and ready to rock.
   def self.create_computation_thread(mutex, cv, options)
-    Thread.new(options[:run_seconds], @@computation_map) do |run_seconds, map|
-      mutex.synchronize {
-        cv.wait(mutex)
-        # Report in order how the threads were executed
-        puts "Running #{Thread.current[:name]}..."
-      }
+    main_mutex = Mutex.new
+    main_cv = ConditionVariable.new
 
-      run_until = Time.now.to_f + run_seconds.to_f
+    thread = nil
+    main_mutex.synchronize {
+      thread = Thread.new(options[:run_seconds], @@computation_map) do |run_seconds, map|
+        mutex.synchronize {
+          main_mutex.synchronize {
+            main_cv.signal
+          }
+          cv.wait(mutex)
+          # Report in order how the threads were executed
+          puts "Running #{Thread.current[:name]}..."
+        }
 
-      i = 0
-      while Time.now.to_f < run_until
-        i += 1
+        run_until = Time.now.to_f + run_seconds.to_f
+
+        i = 0
+        while Time.now.to_f < run_until
+          i += 1
+        end
+
+        @@computation_mutex.synchronize {
+          map[Thread.current[:name]] = i
+        }
       end
-
-      @@computation_mutex.synchronize {
-        map[Thread.current[:name]] = i
-      }
-    end
+      main_cv.wait(main_mutex)
+    }
+    thread
   end
 
   def self.create_thread_name(type)
