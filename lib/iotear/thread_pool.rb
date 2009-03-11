@@ -40,7 +40,7 @@ class ThreadPool
             creator_cv.wait(creator_mutex)
           end
         end
-        # Ensures that main thread won't spawn unti
+        # Ensures that main thread won't run until it receives a signal that it's ok
         main_cv.wait(main_mutex)
       end
 
