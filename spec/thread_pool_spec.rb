@@ -35,9 +35,11 @@ describe ThreadPool do
 
   context "#process" do
     describe "when there are threads waiting" do
+      attr_reader :one_thread_working
+      
       it "wakes up a thread to process" do
-
-        @threads_working = false
+        pending
+        @one_thread_working = false
         def test_thread_status
           pool.threads.each do |thread|
             puts thread.status

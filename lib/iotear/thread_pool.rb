@@ -44,6 +44,11 @@ class ThreadPool
         main_cv.wait(main_mutex)
       end
 
+      # There is a race condition that can exist when the last thread spawned may not
+      # be waiting by the time the main thread gets here.  Is there a better way to do this?
+      until @threads[@threads.size-1].status == "sleep"
+        sleep 0.010
+      end
     end
   end
 
