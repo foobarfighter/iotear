@@ -5,12 +5,16 @@ describe ThreadPool do
   attr_reader :thread_count, :pool, :thread_names
 
   def kill_threads(pool)
+    return if pool.threads.nil?
+
     pool.threads.each do |thread|
       thread.kill!
     end
   end
 
   before do
+    Thread.abort_on_exception = true
+
     @thread_count = 10
     @pool = ThreadPool.new(@thread_count)
     @thread_names = pool.threads.collect { |thread| thread[:name] }
@@ -22,13 +26,15 @@ describe ThreadPool do
   end
 
   context "#initialize" do
-    it "sets cv" do
-      pool.cv.should_not be_nil
-    end
 
     it "sets the threads" do
       pool.threads.should_not be_nil
-      pool.threads.size.should == 10
+      pool.threads.size.should == thread_count
+    end
+
+    it "sets the waiters" do
+      pool.waiters.should_not be_nil
+      pool.waiters.size.should == thread_count
     end
 
     it "creates n number of sleeping threads" do
@@ -43,7 +49,7 @@ describe ThreadPool do
       after do
         kill_threads(pool)
       end
-      
+
       it "gives each thread a default name" do
         pool.threads.each do |thread|
           thread[:name].should match(/foo\d+/)
@@ -61,21 +67,61 @@ describe ThreadPool do
     end
   end
 
+  context "#kill_all!" do
+    attr_reader :outside_thread
+
+    before do
+      @outside_thread = Thread.new { sleep 10 }
+    end
+
+    after do
+      @outside_thread.kill!
+    end
+
+    it "kills all threads that belong to the thread pool" do
+      threads = pool.threads.dup
+      pool.kill_all!
+      threads.each { |thread| thread.status.should be_false }
+    end
+
+    it "sets pool.threads to nil" do
+      pool.kill_all!
+      pool.threads.should be_nil
+    end
+
+    it "sets pool.waiters to nil" do
+      pool.kill_all!
+      pool.waiters.should be_nil
+    end
+  end
+
   context "#process" do
     describe "when there are threads waiting" do
-      attr_reader :one_thread_working
-      
+      attr_reader :mutex, :cv, :main_thread
+
+      before do
+        @mutex = Mutex.new
+        @cv = ConditionVariable.new
+        @main_thread = Thread.current
+      end
+
       it "wakes up a thread to process" do
         @threads_working = 0
-        def sleepy
-          sleep 1 # Should be enough time to see if all threads are working
+        def run_and_signal
+          mutex.synchronize do
+            @threads_working += 1 if Thread.current != main_thread
+            cv.signal
+          end
         end
-        pool.process { sleepy }
-        
-        pool.threads.each do |thread|
-          @threads_working += 1 if thread[:status] == 'run'
+
+        mutex.synchronize do
+          pool.process { run_and_signal }
+          cv.wait(mutex)
+          pool.process { run_and_signal }
+          cv.wait(mutex)
         end
-        @threads_working.should == 1
+
+        @threads_working.should == 2
       end
     end
 
