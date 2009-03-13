@@ -67,7 +67,7 @@ class ThreadPool
   end
 
   def kill_all!
-    @threads.each { |thread| thread.kill! }
+    @threads.each { |thread| Thread.kill(thread) }
     @threads = nil
     @waiters = nil
   end

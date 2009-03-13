@@ -8,7 +8,7 @@ describe ThreadPool do
     return if pool.threads.nil?
 
     pool.threads.each do |thread|
-      thread.kill!
+      Thread.kill(thread)
     end
   end
 
@@ -75,13 +75,14 @@ describe ThreadPool do
     end
 
     after do
-      @outside_thread.kill!
+      Thread.kill(@outside_thread)
     end
 
     it "kills all threads that belong to the thread pool" do
       threads = pool.threads.dup
       pool.kill_all!
-      threads.each { |thread| thread.status.should be_false }
+      threads.each { |thread| [false, "aborting"].should include(thread.status) }
+      ["sleep", "run"].should include(outside_thread.status)
     end
 
     it "sets pool.threads to nil" do
@@ -97,37 +98,52 @@ describe ThreadPool do
 
   context "#process" do
     describe "when there are threads waiting" do
-      attr_reader :mutex, :cv, :main_thread
+      attr_reader :mutex, :cv, :main_thread, :run_count, :threads_working
 
       before do
         @mutex = Mutex.new
         @cv = ConditionVariable.new
+        @run_count = 2
         @main_thread = Thread.current
+        @threads_working = 0
+
+        run_count = 2
+        mutex.synchronize do
+          (1..run_count).each do
+            pool.process { run_and_signal }
+            cv.wait(mutex)
+          end
+        end
+      end
+
+      def run_and_signal
+        mutex.synchronize do
+          @threads_working += 1 if Thread.current != main_thread
+          cv.signal
+        end
+        Thread.stop
       end
 
       it "wakes up a thread to process" do
-        @threads_working = 0
-        def run_and_signal
-          mutex.synchronize do
-            @threads_working += 1 if Thread.current != main_thread
-            cv.signal
-          end
-        end
+        threads_working.should == run_count
+      end
 
-        mutex.synchronize do
-          pool.process { run_and_signal }
-          cv.wait(mutex)
-          pool.process { run_and_signal }
-          cv.wait(mutex)
-        end
+      it "pops off a waiter" do
+        pool.waiters.size.should == pool.threads.size - threads_working
+      end
 
-        @threads_working.should == 2
+      it "returns the thread that is was selected to handle the task" do
+        thread = pool.process { true }
+        thread.is_a?(Thread)
+        thread.should_not == Thread.current
       end
     end
 
     describe "when there are no threads waiting" do
       describe "when :block_on_exhaust is true" do
-        it "waits for a thread to become available before processing"
+        it "waits for a thread to become available before processing" do
+
+        end
       end
 
       describe "when :block_on_exhaust is false" do
