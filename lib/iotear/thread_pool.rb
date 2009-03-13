@@ -1,7 +1,7 @@
 require 'thread'
 
 class ThreadPool
-  attr_reader :threads
+  attr_reader :threads, :mutex, :cv
 
   DEFAULT_THREAD_PREFIX = "threadpool"
   DEFAULT_BLOCK_ON_EXHAUST = false
@@ -16,12 +16,13 @@ class ThreadPool
 
   def initialize(thread_count, options = {})
     @threads ||= []
+    @thread_data ||= {}
 
     main_mutex = Mutex.new
     main_cv = ConditionVariable.new
 
-    creator_mutex = Mutex.new
-    creator_cv = ConditionVariable.new
+    @mutex = Mutex.new
+    @cv = ConditionVariable.new
 
     # Serially wait for each thread to spawn
     main_mutex.synchronize do
@@ -29,16 +30,20 @@ class ThreadPool
       (1..thread_count).each do |i|
         @threads << Thread.new do
           # Lock owner for spawned thread to wait on
-          creator_mutex.synchronize do
+          @mutex.synchronize do
             # Wait until main thread has released it's lock before spawning
             main_mutex.synchronize do
+              # Initialize data that will be available to main thread
               Thread.current[:name] = (options[:thread_prefix] || DEFAULT_THREAD_PREFIX) + i.to_s
               # Signal main thread that it's ok spawn
               main_cv.signal
             end
             # Put spawned thread into waiting state
-            creator_cv.wait(creator_mutex)
+            @cv.wait(@mutex)
           end
+
+          Thread.current[:task]
+          Thread.current[:args]
         end
         # Ensures that main thread won't run until it receives a signal that it's ok
         main_cv.wait(main_mutex)
@@ -52,9 +57,18 @@ class ThreadPool
     end
   end
 
+  def process(*args, &block)
+#    mutex.synchronize do
+#
+#      Thread.current[:task] = block
+#      Thread.current[:args] = args
+#    end
 
-  def process(&block)
     yield unless block.nil?
   end
 
+  private
+  def find_next_ready_thread
+    
+  end
 end
