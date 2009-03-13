@@ -1,7 +1,7 @@
 require 'thread'
 
 class ThreadPool
-  attr_reader :threads, :waiters
+  attr_reader :threads, :waiters, :main_mutex, :main_cv
 
   DEFAULT_THREAD_PREFIX = "threadpool"
   DEFAULT_BLOCK_ON_EXHAUST = false
@@ -15,11 +15,13 @@ class ThreadPool
   #     By default, this is set to DEFAULT_BLOCK_ON_EXHAUST.
 
   def initialize(thread_count, options = {})
+    process_options(options)
+
     @threads ||= []
     @waiters ||= []
 
-    main_mutex = Mutex.new
-    main_cv = ConditionVariable.new
+    @main_mutex = Mutex.new
+    @main_cv = ConditionVariable.new
 
     # Serially wait for each thread to spawn
     main_mutex.synchronize do
@@ -57,12 +59,20 @@ class ThreadPool
   end
 
   def process(*args, &block)
-    waiter = waiters.pop
+    waiter = nil
+    if block_on_exhaust?
+      while waiter.nil? do
+        waiter = next_waiter
+        Thread.pass
+      end
+    else
+      waiter = next_waiter || spawn_waiter
+    end
+
     waiter[:task] = block
     waiter[:task_args] = args
 
     waiter.run
-
     waiter
   end
 
@@ -76,4 +86,23 @@ class ThreadPool
     @waiters.size == 0
   end
 
+  def block_on_exhaust?
+    @block_on_exhaust
+  end
+
+  private
+
+  def process_options(options)
+    @block_on_exhaust = options[:block_on_exhaust] || false
+  end
+
+  def next_waiter
+    main_mutex.synchronize do
+      waiter = waiters.pop
+    end
+  end
+
+  def spawn_waiter
+
+  end
 end

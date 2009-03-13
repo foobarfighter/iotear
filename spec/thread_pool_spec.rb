@@ -201,8 +201,49 @@ describe ThreadPool do
 
     describe "when there are no threads waiting" do
       describe "when :block_on_exhaust is true" do
-        it "waits for a thread to become available before processing" do
+        attr_reader :mutex, :cv
 
+        before do
+          @pool = ThreadPool.new(thread_count, :block_on_exhaust => true)
+          @mutex = Mutex.new
+          @cv = ConditionVariable.new
+          (1..thread_count-1).each do |i|
+            pool.process { sleep 20 }
+          end
+        end
+
+        after do
+          pool.kill_all!
+        end
+
+        def signal_to_finish
+          thread = nil
+          mutex.synchronize do
+            thread = pool.process do
+              mutex.synchronize do
+                cv.signal
+                cv.wait(mutex)
+              end
+            end
+            cv.wait(mutex)
+          end
+
+          until thread.status == "sleep" do
+            Thread.pass
+          end
+
+          thread
+        end
+
+        it "waits for a thread to become available before processing" do
+          signal_to_finish
+          start_process_time = Time.now.to_f
+          Thread.new do
+            sleep 2
+            cv.broadcast
+          end
+          pool.process { @process_called = true }
+          (Time.now.to_f - start_process_time).should > 1.5  # Give 500ms leeway
         end
       end
 
