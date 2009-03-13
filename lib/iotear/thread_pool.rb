@@ -83,7 +83,9 @@ class ThreadPool
   end
 
   def waiting?
-    @waiters.size == 0
+    main_mutex.synchronize do
+      @waiters.size == 0
+    end
   end
 
   def block_on_exhaust?

@@ -116,20 +116,6 @@ describe ThreadPool do
         pool.should_not be_waiting
       end
     end
-#    describe "when there are no thread waiting" do
-    #      (1..pool.threads.size).each do |i|
-    #        pool.process { sleep 10 }
-    #      end
-    #      pool.should_not be_waiting
-    #    end
-
-    #      waiter_count = 2
-    #      (1..pool.threads.size-waiter_count).each do |i|
-    #        pool.process { sleep 10 }
-    #      end
-    #      pool.waiters.should == waiter_count
-    #      pool.should be_waiting
-    #    end
   end
 
 
