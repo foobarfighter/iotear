@@ -96,6 +96,43 @@ describe ThreadPool do
     end
   end
 
+  context "#waiting?" do
+    describe "when there are no threads left to service the task" do
+      it "returns true" do
+        (1..thread_count).each do |i|
+          pool.process { sleep 10 }
+        end
+        pool.should be_waiting
+      end
+    end
+
+    describe "when there are threads left to service the task" do
+      it "returns true" do
+        waiter_count = 2
+        (1..(thread_count - waiter_count)).each do |i|
+          pool.process { sleep 10 }
+        end
+        pool.waiters.size.should == waiter_count
+        pool.should_not be_waiting
+      end
+    end
+#    describe "when there are no thread waiting" do
+    #      (1..pool.threads.size).each do |i|
+    #        pool.process { sleep 10 }
+    #      end
+    #      pool.should_not be_waiting
+    #    end
+
+    #      waiter_count = 2
+    #      (1..pool.threads.size-waiter_count).each do |i|
+    #        pool.process { sleep 10 }
+    #      end
+    #      pool.waiters.should == waiter_count
+    #      pool.should be_waiting
+    #    end
+  end
+
+
   context "#process" do
     describe "when there are threads waiting" do
       attr_reader :mutex, :cv, :main_thread, :run_count, :threads_working
@@ -128,7 +165,7 @@ describe ThreadPool do
         threads_working.should == run_count
       end
 
-      it "pops off a waiter" do
+      it "removes a waiter" do
         pool.waiters.size.should == pool.threads.size - threads_working
       end
 
@@ -136,6 +173,29 @@ describe ThreadPool do
         thread = pool.process { true }
         thread.is_a?(Thread)
         thread.should_not == Thread.current
+      end
+
+      describe "when the thread has finished processing" do
+        it "returns a thread back to the waiting thread pool" do
+          thread_count = pool.waiters.size
+          thread_count.should == pool.threads.size - run_count
+          thread = nil
+          mutex.synchronize do
+            thread = pool.process do
+              mutex.synchronize do
+                cv.signal
+                cv.wait(mutex)
+              end
+            end
+            cv.wait(mutex)
+          end
+          until thread.status == "sleep" do
+            Thread.pass
+          end
+          pool.waiters.size.should == thread_count - 1
+          cv.signal
+          pool.waiters.size.should == thread_count
+        end
       end
     end
 

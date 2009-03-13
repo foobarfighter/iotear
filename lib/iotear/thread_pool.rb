@@ -72,9 +72,8 @@ class ThreadPool
     @waiters = nil
   end
 
-  private
-
-  def find_next_ready_thread
-
+  def waiting?
+    @waiters.size == 0
   end
+
 end
