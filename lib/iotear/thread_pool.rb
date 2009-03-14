@@ -1,7 +1,7 @@
 require 'thread'
 
 class ThreadPool
-  attr_reader :threads, :waiters, :main_mutex, :main_cv
+  attr_reader :threads, :thread_prefix, :waiters, :main_mutex, :main_cv
 
   DEFAULT_THREAD_PREFIX = "threadpool"
   DEFAULT_BLOCK_ON_EXHAUST = false
@@ -23,39 +23,7 @@ class ThreadPool
     @main_mutex = Mutex.new
     @main_cv = ConditionVariable.new
 
-    # Serially wait for each thread to spawn
-    main_mutex.synchronize do
-      (1..thread_count).each do |i|
-        @threads << Thread.new do
-          # Wait until main thread has released it's lock before spawning
-          main_mutex.synchronize do
-            # Initialize data that will be available to main thread
-            Thread.current[:name] = (options[:thread_prefix] || DEFAULT_THREAD_PREFIX) + i.to_s
-            # Signal main thread that it's ok spawn
-            main_cv.signal
-          end
-
-          while true
-            Thread.stop
-            Thread.current[:task].call(Thread.current[:task_args])
-            main_mutex.synchronize do
-              @waiters << Thread.current
-            end
-          end
-        end
-
-        # Ensures that main thread won't run until it receives a signal that it's ok
-        main_cv.wait(main_mutex)
-      end
-
-      # There is a race condition that can exist when the last thread spawned may not
-      # be waiting by the time the main thread gets here.  Is there a better way to do this?
-      until @threads[@threads.size-1].status == "sleep"
-        Thread.pass
-      end
-
-      @waiters = @threads.dup
-    end
+    spawn_waiters(thread_count)
   end
 
   def process(*args, &block)
@@ -66,7 +34,7 @@ class ThreadPool
         Thread.pass
       end
     else
-      waiter = next_waiter || spawn_waiter
+      waiter = next_waiter || spawn_waiters.last
     end
 
     waiter[:task] = block
@@ -95,7 +63,8 @@ class ThreadPool
   private
 
   def process_options(options)
-    @block_on_exhaust = options[:block_on_exhaust] || false
+    @block_on_exhaust = options[:block_on_exhaust] || DEFAULT_BLOCK_ON_EXHAUST
+    @thread_prefix = options[:thread_prefix] || DEFAULT_THREAD_PREFIX
   end
 
   def next_waiter
@@ -104,7 +73,39 @@ class ThreadPool
     end
   end
 
-  def spawn_waiter
+  def spawn_waiters(thread_count = 1)
+    main_mutex.synchronize do
+      (1..thread_count).each do |i|
+        @threads << Thread.new do
+          # Wait until main thread has released it's lock before spawning
+          main_mutex.synchronize do
+            # Initialize data that will be available to main thread
+            Thread.current[:name] = (thread_prefix || DEFAULT_THREAD_PREFIX) + i.to_s
+            # Signal main thread that it's ok spawn
+            main_cv.signal
+          end
 
+          while true
+            Thread.stop
+            Thread.current[:task].call(Thread.current[:task_args])
+            main_mutex.synchronize do
+              @waiters << Thread.current
+            end
+          end
+        end
+
+        # Ensures that main thread won't run until it receives a signal that it's ok
+        main_cv.wait(main_mutex)
+        @waiters << @threads.last
+      end
+
+      # There is a race condition that can exist when the last thread spawned may not
+      # be waiting by the time the main thread gets here.  Is there a better way to do this?
+      until @threads[@threads.size-1].status == "sleep"
+        Thread.pass
+      end
+    end
+
+    @waiters
   end
 end

@@ -118,7 +118,6 @@ describe ThreadPool do
     end
   end
 
-
   context "#process" do
     describe "when there are threads waiting" do
       attr_reader :mutex, :cv, :main_thread, :run_count, :threads_working
@@ -185,60 +184,86 @@ describe ThreadPool do
       end
     end
 
-    describe "when there are no threads waiting" do
-      describe "when :block_on_exhaust is true" do
-        attr_reader :mutex, :cv
 
-        before do
-          @pool = ThreadPool.new(thread_count, :block_on_exhaust => true)
-          @mutex = Mutex.new
-          @cv = ConditionVariable.new
-          (1..thread_count-1).each do |i|
-            pool.process { sleep 20 }
-          end
+    context "option[:block_on_exhaust]" do
+      attr_reader :mutex, :cv
+
+      after do
+        pool.kill_all!
+      end
+
+      def create_pool_with_block_on_exhaust(block_on_exhaust)
+        @pool = ThreadPool.new(thread_count, :block_on_exhaust => block_on_exhaust)
+        @mutex = Mutex.new
+        @cv = ConditionVariable.new
+        (1..thread_count-1).each do |i|
+          pool.process { sleep 20 }
         end
+      end
 
-        after do
-          pool.kill_all!
-        end
-
-        def signal_to_finish
-          thread = nil
-          mutex.synchronize do
-            thread = pool.process do
-              mutex.synchronize do
-                cv.signal
-                cv.wait(mutex)
-              end
+      def signal_to_finish
+        thread = nil
+        mutex.synchronize do
+          thread = pool.process do
+            mutex.synchronize do
+              cv.signal
+              cv.wait(mutex)
             end
-            cv.wait(mutex)
           end
-
-          until thread.status == "sleep" do
-            Thread.pass
-          end
-
-          thread
+          cv.wait(mutex)
         end
 
-        it "waits for a thread to become available before processing" do
-          signal_to_finish
-          start_process_time = Time.now.to_f
-          Thread.new do
-            sleep 2
-            cv.broadcast
-          end
-          pool.process { @process_called = true }
-          (Time.now.to_f - start_process_time).should > 1.5  # Give 500ms leeway
+        until thread.status == "sleep" do
+          Thread.pass
         end
+
+        thread
       end
 
-      describe "when :block_on_exhaust is false" do
-        it "spawns a new thread temporarily to handle the request"
-      end
+      describe "when there are no threads waiting" do
+        describe "when :block_on_exhaust is true" do
+          before do
+            create_pool_with_block_on_exhaust(true)
+          end
 
-      describe "by default" do
-        it "spawns a new thread temporarily to handle the request"
+          it "waits for a thread to become available before processing" do
+            signal_to_finish
+            start_process_time = Time.now.to_f
+            Thread.new do
+              sleep 1
+              cv.broadcast
+            end
+            pool.process { @process_called = true }
+            (Time.now.to_f - start_process_time).should > 0.800  # Give 200ms leeway
+            sleep 0.100
+            @process_called.should be_true
+            #TODO ensure that waiters and threads are the proper sizes
+          end
+        end
+
+        describe "when :block_on_exhaust is false" do
+          before do
+            create_pool_with_block_on_exhaust(false)
+          end
+
+          it "spawns a new thread temporarily to handle the request" do
+            signal_to_finish
+            start_process_time = Time.now.to_f
+            Thread.new do
+              sleep 1
+              cv.broadcast
+            end
+            pool.process { @process_called = true }
+            (Time.now.to_f - start_process_time).should < 0.800  # Give 200ms leeway
+            @process_called.should be_true
+            sleep 0.100
+            #TODO ensure that waiters and threads are the proper sizes
+          end
+        end
+
+        describe "by default" do
+          it "spawns a new thread temporarily to handle the request"
+        end
       end
     end
 
