@@ -34,7 +34,11 @@ class ThreadPool
         Thread.pass
       end
     else
-      waiter = next_waiter || spawn_waiters.last
+      waiter = next_waiter
+      if waiter.nil?
+        spawn_waiters(1, false)
+        waiter = next_waiter
+      end
     end
 
     waiter[:task] = block
@@ -60,7 +64,7 @@ class ThreadPool
     @block_on_exhaust
   end
 
-  private
+  private 
 
   def process_options(options)
     @block_on_exhaust = options[:block_on_exhaust] || DEFAULT_BLOCK_ON_EXHAUST
@@ -73,7 +77,7 @@ class ThreadPool
     end
   end
 
-  def spawn_waiters(thread_count = 1)
+  def spawn_waiters(thread_count = 1, run_forever = true)
     main_mutex.synchronize do
       (1..thread_count).each do |i|
         @threads << Thread.new do
@@ -85,13 +89,13 @@ class ThreadPool
             main_cv.signal
           end
 
-          while true
+          begin
             Thread.stop
             Thread.current[:task].call(Thread.current[:task_args])
             main_mutex.synchronize do
-              @waiters << Thread.current
+              @waiters << Thread.current if run_forever
             end
-          end
+          end while run_forever
         end
 
         # Ensures that main thread won't run until it receives a signal that it's ok
