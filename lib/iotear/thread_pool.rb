@@ -64,12 +64,7 @@ class ThreadPool
     @block_on_exhaust
   end
 
-  private 
-
-  def process_options(options)
-    @block_on_exhaust = options[:block_on_exhaust] || DEFAULT_BLOCK_ON_EXHAUST
-    @thread_prefix = options[:thread_prefix] || DEFAULT_THREAD_PREFIX
-  end
+  protected
 
   def next_waiter
     main_mutex.synchronize do
@@ -111,5 +106,12 @@ class ThreadPool
     end
 
     @waiters
+  end
+
+  private 
+
+  def process_options(options)
+    @block_on_exhaust = options[:block_on_exhaust] || DEFAULT_BLOCK_ON_EXHAUST
+    @thread_prefix = options[:thread_prefix] || DEFAULT_THREAD_PREFIX
   end
 end
