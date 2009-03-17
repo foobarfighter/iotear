@@ -48,6 +48,23 @@ class ThreadPool
     waiter
   end
 
+  def join_all(timeout = nil)
+    processors = nil
+    main_mutex.synchronize do
+      processors = threads - waiters
+      processors.each do |thread|
+        thread[:stop] = true
+      end
+      waiters.each do |thread|
+        thread[:stop] = true
+      end
+    end
+    (1..waiters.size).each do |i|
+      process { true }
+    end
+    threads.each { |thread| thread.join(timeout) }    
+  end
+
   def kill_all!
     @threads.each { |thread| Thread.kill(thread) }
     @threads = nil
@@ -88,6 +105,7 @@ class ThreadPool
             Thread.stop
             Thread.current[:task].call(Thread.current[:task_args])
             main_mutex.synchronize do
+              run_forever = false if Thread.current[:stop] == true
               @waiters << Thread.current if run_forever
             end
           end while run_forever
@@ -108,10 +126,11 @@ class ThreadPool
     @waiters
   end
 
-  private 
+  private
 
   def process_options(options)
     @block_on_exhaust = options[:block_on_exhaust] || DEFAULT_BLOCK_ON_EXHAUST
     @thread_prefix = options[:thread_prefix] || DEFAULT_THREAD_PREFIX
   end
+
 end

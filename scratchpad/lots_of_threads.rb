@@ -10,7 +10,7 @@ OptionParser.new do |opts|
     options[:run_seconds] = v
   end
   opts.on("-c", "--count [FLOAT]", "Thread number of threads to spin up") do |v|
-    options[:max_threads] = v.to_i
+    options[:max_threads] = v.value
   end
 end.parse!
 

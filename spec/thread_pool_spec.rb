@@ -96,6 +96,31 @@ describe ThreadPool do
     end
   end
 
+  context "#join_all" do
+    attr_reader :mutex, :cv, :expected_waiter_count, :processors
+
+    before do
+      @mutex = Mutex.new
+      @cv = ConditionVariable.new
+      @expected_waiter_count = 3
+      end_time = Time.now.to_i+3
+      @processors = (1..thread_count - expected_waiter_count).collect do |i|
+        pool.process do
+          while Time.now.to_i < end_time
+            true
+          end
+        end
+      end
+      pool.waiters.size == expected_waiter_count
+    end
+
+    it "joins on all threads" do
+      pool.join_all
+      processors.each {|t| t.status.should == false }
+    end
+
+  end
+
   context "#waiting?" do
     describe "when there are no threads left to service the task" do
       it "returns true" do
@@ -192,15 +217,6 @@ describe ThreadPool do
         pool.kill_all!
       end
 
-      def create_pool_with_block_on_exhaust(block_on_exhaust)
-        @pool = ThreadPool.new(thread_count, :block_on_exhaust => block_on_exhaust)
-        @mutex = Mutex.new
-        @cv = ConditionVariable.new
-        (1..thread_count-1).each do |i|
-          pool.process { sleep 20 }
-        end
-      end
-
       def create_signal_to_finish_processor
         thread = nil
         mutex.synchronize do
@@ -218,6 +234,15 @@ describe ThreadPool do
         end
 
         thread
+      end
+
+      def create_pool_with_block_on_exhaust(block_on_exhaust)
+        @pool = ThreadPool.new(thread_count, :block_on_exhaust => block_on_exhaust)
+        @mutex = Mutex.new
+        @cv = ConditionVariable.new
+        (1..thread_count-1).each do |i|
+          pool.process { sleep 20 }
+        end
       end
 
       describe "when there are no threads waiting" do
@@ -275,7 +300,7 @@ describe ThreadPool do
             pool.should_not be_block_on_exhaust
           end
 
-          it "spawns a new thread temporarily to handle the request" do      
+          it "spawns a new thread temporarily to handle the request" do
             adhoc_thread_process_plus_wait_time.should < 0.200  # Give 200ms leeway
 
             # Give pool.process time to run
