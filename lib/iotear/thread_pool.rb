@@ -103,7 +103,8 @@ class ThreadPool
 
           begin
             Thread.stop
-            Thread.current[:task].call(Thread.current[:task_args])
+            # TODO: Investigate a little more as to why Thread.current[:task] can be nil under JRuby when killing/joining
+            Thread.current[:task].call(Thread.current[:task_args]) unless Thread.current[:task].nil?
             main_mutex.synchronize do
               run_forever = false if Thread.current[:stop] == true
               @waiters << Thread.current if run_forever

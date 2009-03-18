@@ -25,9 +25,10 @@ class Counter
     # Ruby 1.9 doesn't race, but ruby 1.8.7 does when not synchronizing.
     # I think this is because 1.9 uses a global interpreter lock for multithreading
     # although I still don't understand what that means completely.
-    #@mutex.synchronize do
+    @mutex.synchronize do
+      puts "done"
       @counter += 1
-    #end
+    end
   end
 end
 
@@ -37,7 +38,7 @@ def expensive_computation(counter, end_index)
   end
 end
 
-pool = ThreadPool.new(thread_count)
+pool = ThreadPool.new(thread_count, :block_on_exhaust => false)
 
 counter =  Counter.new
 (1..thread_count).each do |i|
