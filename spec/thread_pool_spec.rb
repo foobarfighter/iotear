@@ -9,6 +9,7 @@ describe ThreadPool do
 
     pool.threads.each do |thread|
       #TODO: See TODO about killing threads in ThreadPool
+      puts "thread status: #{thread.status}"
       Thread.kill(thread)
     end
   end
@@ -23,7 +24,8 @@ describe ThreadPool do
   end
 
   after do
-#    kill_threads(pool)
+    #pool.kill_all! unless pool.threads.nil?
+    #kill_threads(pool)
   end
 
 #  context "#initialize" do
@@ -68,34 +70,34 @@ describe ThreadPool do
 #    end
 #  end
 
-#  context "#kill_all!" do
-#    attr_reader :outside_thread
-#
-#    before do
-#      @outside_thread = Thread.new { sleep 10 }
-#    end
-#
-#    after do
-#      Thread.kill(@outside_thread)
-#    end
-#
-#    it "kills all threads that belong to the thread pool" do
-#      threads = pool.threads.dup
-#      pool.kill_all!
-#      threads.each { |thread| [false, "aborting"].should include(thread.status) }
-#      ["sleep", "run"].should include(outside_thread.status)
-#    end
-#
-#    it "sets pool.threads to nil" do
-#      pool.kill_all!
-#      pool.threads.should be_nil
-#    end
-#
-#    it "sets pool.waiters to nil" do
-#      pool.kill_all!
-#      pool.waiters.should be_nil
-#    end
-#  end
+  context "#kill_all!" do
+    attr_reader :outside_thread
+
+    before do
+      @outside_thread = Thread.new { sleep 10 }
+    end
+
+    after do
+      Thread.kill(@outside_thread)
+    end
+
+    it "kills all threads that belong to the thread pool" do
+      threads = pool.threads.dup
+      pool.kill_all!
+      threads.each { |thread| [false, "aborting"].should include(thread.status) }
+      ["sleep", "run"].should include(outside_thread.status)
+    end
+
+    it "sets pool.threads to nil" do
+      pool.kill_all!
+      pool.threads.should be_nil
+    end
+
+    it "sets pool.waiters to nil" do
+      pool.kill_all!
+      pool.waiters.should be_nil
+    end
+  end
 
 #  context "#join_all" do
 #    attr_reader :mutex, :cv, :expected_waiter_count, :processors
@@ -121,7 +123,7 @@ describe ThreadPool do
 #    end
 #
 #  end
-
+#
 #  context "#waiting?" do
 #    describe "when there are no threads left to service the task" do
 #      it "returns true" do
@@ -159,9 +161,20 @@ describe ThreadPool do
         mutex.synchronize do
           (1..run_count).each do
             pool.process { run_and_signal }
+            puts "waiting...."
             cv.wait(mutex)
           end
         end
+      end
+
+      after do
+        #TODO: Figure out why kill_all! seems to hang the spec
+        puts "killing!"
+        pool.threads.each do |t|
+          cv.broadcast
+        end
+        pool.kill_all!
+        puts "done killing!"
       end
 
       def run_and_signal
@@ -188,153 +201,145 @@ describe ThreadPool do
 
       describe "when the thread has finished processing" do
         it "returns a thread back to the waiting thread pool" do
-          puts "doing stuff"
           thread_count = pool.waiters.size
           thread_count.should == pool.threads.size - run_count
           thread = nil
-          p cv
           mutex.synchronize do
             thread = pool.process do
               mutex.synchronize do
-                cv.broadcast
-                puts "signaled #{cv}"
-                puts "about to wait"
+                cv.signal
                 cv.wait(mutex)
-                puts "waiting"
               end
             end
-            puts "sleeping"
-            cv.wait(mutex)
+            cv.wait(mutex)      
           end
-          until thread.status == "sleep" do
-            puts "thread.status"
-            sleep 1
-            cv.broadcast
-            sleep 1
-            puts "thread.status: #{thread.status}"
-          end
+
           pool.waiters.size.should == thread_count - 1
           cv.signal
+          until thread.status == "sleep" do
+            Thread.pass
+          end
           pool.waiters.size.should == thread_count
         end
       end
     end
-
-
-#    context "option[:block_on_exhaust]" do
-#      attr_reader :mutex, :cv
-#
-#      after do
-#        pool.kill_all!
-#      end
-#
-#      def create_signal_to_finish_processor
-#        thread = nil
-#        mutex.synchronize do
-#          thread = pool.process do
-#            mutex.synchronize do
-#              cv.signal
-#              cv.wait(mutex)
-#            end
-#          end
-#          cv.wait(mutex)
-#        end
-#
-#        until thread.status == "sleep" do
-#          Thread.pass
-#        end
-#
-#        thread
-#      end
-#
-#      def create_pool_with_block_on_exhaust(block_on_exhaust)
-#        @pool = ThreadPool.new(thread_count, :block_on_exhaust => block_on_exhaust)
-#        @mutex = Mutex.new
-#        @cv = ConditionVariable.new
-#        (1..thread_count-1).each do |i|
-#          pool.process { sleep 20 }
-#        end
-#      end
-#
-##      describe "when there are no threads waiting" do
-##        attr_reader :start_process_time, :adhoc_thread_count,
-##                :adhoc_waiter_count, :adhoc_thread_process_plus_wait_time
-##
-##        before do
-##          create_pool_with_block_on_exhaust(block_on_exhaust_option_for_spec)
-##          create_signal_to_finish_processor
-##          @start_process_time = Time.now.to_f
-##          Thread.new do
-##            sleep 1
-##            cv.broadcast
-##          end
-##          @adhoc_thread_count = 0
-##          @adhoc_waiter_count = 0
-##          pool.process do
-##            @adhoc_thread_count = pool.threads.size
-##            @adhoc_waiter_count = pool.waiters.size
-##          end
-##          @adhoc_thread_process_plus_wait_time = Time.now.to_f - start_process_time
-##        end
-##
-##        after do
-##          # There shouldn't be any additional waiters added to the pool
-##          # under any circumstances
-##          adhoc_waiter_count.should == 0
-##        end
-##
-##
-###        describe "when :block_on_exhaust is true" do
-###          def block_on_exhaust_option_for_spec
-###            true
-###          end
-###
-###          before do
-###            pool.should be_block_on_exhaust
-###          end
-###
-###          it "waits for a thread to become available before processing" do
-###            adhoc_thread_process_plus_wait_time.should > 0.800  # Give 200ms leeway
-###
-###            # Give pool.process time to run
-###            sleep 0.100
-###            adhoc_thread_count.should == thread_count
-###          end
-###        end
-##
-###        describe "when :block_on_exhaust is false" do
-###          def block_on_exhaust_option_for_spec
-###            false
-###          end
-###
-###          before do
-###            pool.should_not be_block_on_exhaust
-###          end
-###
-###          it "spawns a new thread temporarily to handle the request" do
-###            adhoc_thread_process_plus_wait_time.should < 0.200  # Give 200ms leeway
-###
-###            # Give pool.process time to run
-###            sleep 0.100
-###            adhoc_thread_count.should == thread_count + 1
-###          end
-###        end
-###
-###        describe "by default" do
-###          def block_on_exhaust_option_for_spec
-###            ThreadPool::DEFAULT_BLOCK_ON_EXHAUST
-###          end
-###
-###          it "spawns a new thread temporarily to handle the request" do
-###            adhoc_thread_process_plus_wait_time.should < 0.200  # Give 200ms leeway
-###            sleep 0.100   # Give pool.process time to run
-###            adhoc_thread_count.should == thread_count + 1
-###          end
-###        end
-##      end
-#    end
-
   end
+#
+#
+##    context "option[:block_on_exhaust]" do
+##      attr_reader :mutex, :cv
+##
+##      after do
+##        pool.kill_all!
+##      end
+##
+##      def create_signal_to_finish_processor
+##        thread = nil
+##        mutex.synchronize do
+##          thread = pool.process do
+##            mutex.synchronize do
+##              cv.signal
+##              cv.wait(mutex)
+##            end
+##          end
+##          cv.wait(mutex)
+##        end
+##
+##        until thread.status == "sleep" do
+##          Thread.pass
+##        end
+##
+##        thread
+##      end
+##
+##      def create_pool_with_block_on_exhaust(block_on_exhaust)
+##        @pool = ThreadPool.new(thread_count, :block_on_exhaust => block_on_exhaust)
+##        @mutex = Mutex.new
+##        @cv = ConditionVariable.new
+##        (1..thread_count-1).each do |i|
+##          pool.process { sleep 20 }
+##        end
+##      end
+##
+###      describe "when there are no threads waiting" do
+###        attr_reader :start_process_time, :adhoc_thread_count,
+###                :adhoc_waiter_count, :adhoc_thread_process_plus_wait_time
+###
+###        before do
+###          create_pool_with_block_on_exhaust(block_on_exhaust_option_for_spec)
+###          create_signal_to_finish_processor
+###          @start_process_time = Time.now.to_f
+###          Thread.new do
+###            sleep 1
+###            cv.broadcast
+###          end
+###          @adhoc_thread_count = 0
+###          @adhoc_waiter_count = 0
+###          pool.process do
+###            @adhoc_thread_count = pool.threads.size
+###            @adhoc_waiter_count = pool.waiters.size
+###          end
+###          @adhoc_thread_process_plus_wait_time = Time.now.to_f - start_process_time
+###        end
+###
+###        after do
+###          # There shouldn't be any additional waiters added to the pool
+###          # under any circumstances
+###          adhoc_waiter_count.should == 0
+###        end
+###
+###
+####        describe "when :block_on_exhaust is true" do
+####          def block_on_exhaust_option_for_spec
+####            true
+####          end
+####
+####          before do
+####            pool.should be_block_on_exhaust
+####          end
+####
+####          it "waits for a thread to become available before processing" do
+####            adhoc_thread_process_plus_wait_time.should > 0.800  # Give 200ms leeway
+####
+####            # Give pool.process time to run
+####            sleep 0.100
+####            adhoc_thread_count.should == thread_count
+####          end
+####        end
+###
+####        describe "when :block_on_exhaust is false" do
+####          def block_on_exhaust_option_for_spec
+####            false
+####          end
+####
+####          before do
+####            pool.should_not be_block_on_exhaust
+####          end
+####
+####          it "spawns a new thread temporarily to handle the request" do
+####            adhoc_thread_process_plus_wait_time.should < 0.200  # Give 200ms leeway
+####
+####            # Give pool.process time to run
+####            sleep 0.100
+####            adhoc_thread_count.should == thread_count + 1
+####          end
+####        end
+####
+####        describe "by default" do
+####          def block_on_exhaust_option_for_spec
+####            ThreadPool::DEFAULT_BLOCK_ON_EXHAUST
+####          end
+####
+####          it "spawns a new thread temporarily to handle the request" do
+####            adhoc_thread_process_plus_wait_time.should < 0.200  # Give 200ms leeway
+####            sleep 0.100   # Give pool.process time to run
+####            adhoc_thread_count.should == thread_count + 1
+####          end
+####        end
+###      end
+##    end
+#
+#  end
 end
 
-Spec::Runner.run
+Spec::Runner.run if ENV['JRUBY']
