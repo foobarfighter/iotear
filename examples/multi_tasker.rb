@@ -2,6 +2,7 @@
 
 # I like to run this script under "time"
 # time ruby multi_tasker.rb
+Thread.abort_on_exception = true
 
 $LOAD_PATH << "#{File.dirname(__FILE__)}/../lib"
 
@@ -22,11 +23,9 @@ class Counter
   end
 
   def inc
-    # Ruby 1.9 doesn't race, but ruby 1.8.7 does when not synchronizing.
-    # I think this is because 1.9 uses a global interpreter lock for multithreading
-    # although I still don't understand what that means completely.
+    # Runs faster in 1.8.7 than jruby and MRI 1.9.x when synchronizing.
+    # This is due to overhead with context switching so many times with native threads.
     @mutex.synchronize do
-      puts "done"
       @counter += 1
     end
   end
@@ -40,6 +39,7 @@ end
 
 pool = ThreadPool.new(thread_count, :block_on_exhaust => false)
 
+runtime_tic = Time.now
 counter =  Counter.new
 (1..thread_count).each do |i|
   pool.process { expensive_computation(counter, end_index) }
@@ -53,3 +53,5 @@ if counter.value == expected_counter
 else
   puts "We raced, got: #{counter.value}, expected: #{expected_counter}"
 end
+
+puts "Total time: #{Time.now.to_f - runtime_tic.to_f} millis"

@@ -62,7 +62,8 @@ class ThreadPool
     (1..waiters.size).each do |i|
       process { true }
     end
-    threads.each { |thread| thread.join(timeout) }
+    # jruby doesn't like it when you pass 0 or nil to join
+    threads.each { |thread| timeout ? thread.join(timeout || 0) : thread.join }
   end
 
   def kill_all!
