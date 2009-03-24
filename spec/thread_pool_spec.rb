@@ -325,5 +325,3 @@ describe ThreadPool do
   end
 
 end
-
-Spec::Runner.run if ENV['JRUBY']
