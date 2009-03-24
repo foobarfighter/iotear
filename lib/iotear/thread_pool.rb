@@ -62,11 +62,11 @@ class ThreadPool
     (1..waiters.size).each do |i|
       process { true }
     end
-    threads.each { |thread| thread.join(timeout) }    
+    threads.each { |thread| thread.join(timeout) }
   end
 
   def kill_all!
-    @threads.each { |thread| Thread.kill(thread) }
+    @threads.each { |thread| Thread.kill(thread); }
     @threads = nil
     @waiters = nil
   end
@@ -103,7 +103,6 @@ class ThreadPool
 
           begin
             Thread.stop
-            # TODO: Investigate a little more as to why Thread.current[:task] can be nil under JRuby when killing/joining
             Thread.current[:task].call(Thread.current[:task_args]) unless Thread.current[:task].nil?
             main_mutex.synchronize do
               run_forever = false if Thread.current[:stop] == true
