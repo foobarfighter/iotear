@@ -5,14 +5,10 @@ require 'rake/rdoctask'
 desc 'Default: run specs.'
 task :default => :spec
 
-desc 'Runs the drails ruby specs.'
-Spec::Rake::SpecTask.new(:runspec) do |t|
-  t.libs << 'lib'
-  t.spec_files = FileList['spec/**/*_spec.rb']
-end
-
 desc 'Test the iotear ruby specs'
-task :spec  => ['runspec'] do
+task :spec do
+  #puts "spec"
+  system("ruby spec/spec_suite.rb") 
 end
 
 desc 'Generate documentation.'
