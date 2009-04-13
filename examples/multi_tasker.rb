@@ -37,7 +37,7 @@ def expensive_computation(counter, end_index)
   end
 end
 
-pool = ThreadPool.new(thread_count, :block_on_exhaust => false)
+pool = IOTear::ThreadPool.new(thread_count, :block_on_exhaust => false)
 
 runtime_tic = Time.now
 counter =  Counter.new
@@ -54,4 +54,4 @@ else
   puts "We raced, got: #{counter.value}, expected: #{expected_counter}"
 end
 
-puts "Total time: #{Time.now.to_f - runtime_tic.to_f} millis"
+puts "Computation time: #{Time.now.to_f - runtime_tic.to_f} millis"

@@ -1,7 +1,7 @@
 require "#{File.dirname(__FILE__)}/spec_helper.rb"
 require 'thread'
 
-describe ThreadPool do
+describe IOTear::ThreadPool do
   attr_reader :thread_count, :pool, :thread_names
 
   def kill_threads(pool)
@@ -16,7 +16,7 @@ describe ThreadPool do
     Thread.abort_on_exception = true
 
     @thread_count = 10
-    @pool = ThreadPool.new(@thread_count)
+    @pool = IOTear::ThreadPool.new(@thread_count)
     @thread_names = pool.threads.collect { |thread| thread[:name] }
     thread_names.size.should == thread_count
   end
@@ -44,7 +44,7 @@ describe ThreadPool do
 
     describe "when a thread prefix is passed" do
       before do
-        @pool = ThreadPool.new(@thread_count, :thread_prefix => "foo")
+        @pool = IOTear::ThreadPool.new(@thread_count, :thread_prefix => "foo")
       end
 
       after do
@@ -60,7 +60,7 @@ describe ThreadPool do
 
     describe "when no thread prefix is passed" do
       it "gives each thread a default name" do
-        @pool = ThreadPool.new(@thread_count)
+        @pool = IOTear::ThreadPool.new(@thread_count)
         pool.threads.each do |thread|
           thread[:name].should match(/threadpool\d+/)
         end
@@ -240,7 +240,7 @@ describe ThreadPool do
     end
 
     def create_pool_with_block_on_exhaust(block_on_exhaust)
-      @pool = ThreadPool.new(thread_count, :block_on_exhaust => block_on_exhaust)
+      @pool = IOTear::ThreadPool.new(thread_count, :block_on_exhaust => block_on_exhaust)
       (1..thread_count-1).each do |i|
         pool.process { sleep 20 }
       end
@@ -312,7 +312,7 @@ describe ThreadPool do
 
       describe "by default" do
         def block_on_exhaust_option_for_spec
-          ThreadPool::DEFAULT_BLOCK_ON_EXHAUST
+          IOTear::ThreadPool::DEFAULT_BLOCK_ON_EXHAUST
         end
 
         it "spawns a new thread temporarily to handle the request" do
