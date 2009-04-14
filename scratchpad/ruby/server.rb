@@ -1,5 +1,29 @@
 require 'socket'
 
+class SelectorStrategy
+  attr_reader :enumerable, :current_index
+
+  def initialize(enumerable)
+    @enumerable = enumerable
+    @current_index = 0
+  end
+
+  def tick
+    if @current_index < @enumerable.size - 1
+      @current_index += 1
+      return @current_index
+    else
+      @current_index = 0
+    end
+    nil
+  end
+
+  def increment
+    tick
+    @current_index
+  end
+end
+
 class NonBlockServer
   MAX_READ_SIZE = 10
 
@@ -8,7 +32,7 @@ class NonBlockServer
   def initialize(port)
     @server = TCPServer.new(port)
     @clients = []
-    @last_index = 0
+    @reader_selector = SelectorStrategy.new(@clients)
     debug "server listening on #{port}"
   end
 
@@ -22,44 +46,48 @@ class NonBlockServer
         IO.select([server])
         retry
       end
+    rescue Errno::Errno::ECONNABORTED, Errno::ECONNRESET
+      debug "connection aborted 1"
+    rescue Exception => e
+      p e
     end
   end
 
   def try_reads
+    client = nil
     begin
-      response = clients[@last_index].recv_nonblock(1)
-      debug "read from #{@last_index}, response: #{response[0]}"
-      increment_index
-    rescue Errno::EAGAIN
-      retry unless tick_index.nil?
-    end
-  end
+      client = clients[@reader_selector.current_index]
+      response = client.recv_nonblock(1)
+      disconnect(client) if response[0].to_s == ""
 
-  def tick_index
-    @last_index ||= 0
-    if @last_index < clients.size - 1
-      @last_index += 1
-      return @last_index
-    else
-      @last_index = 0
+      debug "read from #{@reader_selector.current_index}, response: |#{response[0]}|"
+      @reader_selector.increment
+    rescue Errno::EAGAIN, Errno::EWOULDBLOCK
+      retry unless @reader_selector.tick.nil?
+    rescue Errno::ECONNABORTED, Errno::ECONNRESET
+      debug "haven't received a Errno::ECONNABORTED or Errno::ECONNRESET yet.  TODO: Handle this correctly"
     end
-    nil
-  end
-
-  def increment_index
-    tick_index
-    @last_index
   end
 
   def debug(message)
     puts "[debug] " + message
   end
-end
 
-server = NonBlockServer.new(8888)
+  def disconnect(client)
+    debug "disconnecting #{client}"
+    begin
+      clients.delete_if { |c| c == client }
+    ensure
+      client.close
+    end
+  end
 
-# TODO: Catch an interupt instead of while true
-while true
-  server.try_accept
-  server.try_reads
+  server = NonBlockServer.new(8888)
+
+  # TODO: Catch an interupt instead of while true
+  while true
+    server.try_accept
+    server.try_reads
+    sleep 0.001
+  end
 end
