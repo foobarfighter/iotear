@@ -81,13 +81,13 @@ class NonBlockServer
       client.close
     end
   end
+end
 
-  server = NonBlockServer.new(8888)
+server = NonBlockServer.new(8888)
 
-  # TODO: Catch an interupt instead of while true
-  while true
-    server.try_accept
-    server.try_reads
-    sleep 0.001
-  end
+# TODO: Catch an interupt instead of while true
+while true
+  server.try_accept
+  server.try_reads
+  sleep 0.001
 end
