@@ -5,20 +5,26 @@ $LOAD_PATH << "#{File.dirname(__FILE__)}/../../lib"
 require 'iotear'
 require File.dirname(__FILE__) + '/server'
 
-server = NonBlockServer.new(8888)
-
-# TODO: Catch an interupt instead of while true
-i = 0
-while true
-  server.try_accept
-  server.try_reads
-  server.try_writes
-  sleep 0.001
-  if i % 1000 == 0 && server.clients.size > 0
-    srand(Time.now.to_i)
-    write_client_index = server.clients.size > 1 ? rand(server.clients.size) : 0
-    client = server.clients[write_client_index]
-    client << "hello world, this is your non-blocking IO server speaking\n"
-  end
-  i += 1
+def do_connect(client)
+  puts "#{client.uuid.to_s} connected!"
 end
+
+def do_disconnect
+
+end
+
+def do_message
+
+end
+
+
+server = NonBlockServer.new(8888) do |s|
+  s.on_connect { |client| do_connect(client) }
+#  server.on_disconnect { do_disconnect }
+#  server.on_message { do_message }
+#  server.on_write_success { do_message }
+#  server.on_write_fail { do_message }
+#  server.on_error { do_error }
+end
+
+server.run

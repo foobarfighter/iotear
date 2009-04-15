@@ -15,7 +15,33 @@ class NonBlockServer
     @clients = []
     @reader_selector = SelectorStrategy.new(@clients)
     @block_writer = nil
+    @handlers = {}
     debug "server listening on #{port}"
+    yield(self) if block_given?
+  end
+
+  def on_connect(&block)
+    register_handler(:connect, block)
+  end
+
+  def register_handler(event, block)
+    @handlers[event] = [] unless @handlers.has_key?(event)
+    @handlers[event] << block
+  end
+
+  def run_handlers(event, args = nil)
+    if @handlers[event]
+      @handlers[event].each { |block| block.call(*args) }
+    end
+  end
+
+  def run
+    while true
+      try_accept
+      try_reads
+      try_writes
+      sleep 0.001
+    end
   end
 
   def find_client(socket)
@@ -25,14 +51,17 @@ class NonBlockServer
   def try_accept
     begin
       client_socket, client_sockaddr = server.accept_nonblock
-      @clients << Client.new(client_socket) unless find_client(client_socket)
+      unless find_client(client_socket)
+        @clients << Client.new(client_socket)
+        run_handlers :connect, @clients.last
+      end
     rescue Errno::EAGAIN
       if clients.size == 0
         debug "no client is waiting, falling back to blocking select"
         IO.select([server])
         retry
       end
-    rescue Errno::Errno::ECONNABORTED, Errno::ECONNRESET
+    rescue Errno::ECONNABORTED, Errno::ECONNRESET
       debug "connection aborted 1"
     rescue Exception => e
       p e
