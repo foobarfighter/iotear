@@ -1,4 +1,5 @@
 require "#{File.dirname(__FILE__)}/../lib/iotear"
+require "#{File.dirname(__FILE__)}/tools/test_client"
 
 require 'rubygems'
 require 'spec'

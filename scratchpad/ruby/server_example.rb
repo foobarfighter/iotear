@@ -5,8 +5,6 @@ $LOAD_PATH << "#{File.dirname(__FILE__)}/../../lib"
 require 'iotear'
 require File.dirname(__FILE__) + '/server'
 
-users = []
-
 class User
   attr_reader :username, :client
   attr_writer :username
