@@ -1,3 +1,5 @@
+require 'socket'
+
 module IOTear
   class Server
     attr_reader :socket, :reactors

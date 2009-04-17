@@ -9,3 +9,7 @@ def poll_for_sleep(thread)
     Thread.pass
   end
 end
+
+Spec::Runner.configure do |config|
+  config.mock_with :rr
+end
