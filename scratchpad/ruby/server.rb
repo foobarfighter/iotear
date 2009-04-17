@@ -6,7 +6,8 @@ require 'rubygems'
 require 'uuid'
 
 class NonBlockServer
-  BLOCK_SIZE = 10
+  BLOCK_SIZE = 4096
+  DEBUG = false
 
   attr_reader :clients, :server
 
@@ -16,7 +17,7 @@ class NonBlockServer
     @reader_selector = SelectorStrategy.new(@clients)
     @block_writer = nil
     @handlers = {}
-    debug "server listening on #{port}"
+    info "server listening on #{port}"
     yield(self) if block_given?
   end
 
@@ -24,18 +25,30 @@ class NonBlockServer
     register_handler(:connect, block)
   end
 
+  def on_disconnect(&block)
+    register_handler(:disconnect, block)
+  end
+
+  def on_message(&block)
+    register_handler(:message, block)
+  end
+
+  def on_write_success(&block)
+    register_handler(:write_success, block)
+  end
+
   def register_handler(event, block)
     @handlers[event] = [] unless @handlers.has_key?(event)
     @handlers[event] << block
   end
 
-  def run_handlers(event, args = nil)
+  def run_handlers(event, *args)
     if @handlers[event]
       @handlers[event].each { |block| block.call(*args) }
     end
   end
 
-  def run
+  def run  
     while true
       try_accept
       try_reads
@@ -81,6 +94,7 @@ class NonBlockServer
       else
         debug "read from #{@reader_selector.current_index}, response: |#{message_block}|"
         client.write_in(message_block)
+        run_handlers(:message, client, message_block)
       end
       @reader_selector.increment
     rescue Errno::EAGAIN, Errno::EWOULDBLOCK
@@ -101,7 +115,10 @@ class NonBlockServer
         end
       end
 
-      @block_writer.send_nonblock unless @block_writer.nil?
+      if @block_writer && !@block_writer.finished?
+        @block_writer.send_nonblock
+        run_handlers(:write_success, @block_writer.client, @block_writer.block)
+      end
     rescue Errno::EAGAIN, Errno::EWOULDBLOCK
       #noop?
     rescue Errno::ECONNABORTED, Errno::ECONNRESET
@@ -110,7 +127,11 @@ class NonBlockServer
   end
 
   def debug(message)
-    puts "[debug] " + message
+    puts "[debug] " + message if DEBUG
+  end
+
+  def info(message)
+    puts "[info] " + message
   end
 
   def disconnect(client)
@@ -120,5 +141,6 @@ class NonBlockServer
     ensure
       client.socket.close
     end
+    run_handlers(:disconnect, client)
   end
 end
