@@ -13,8 +13,6 @@ describe IOTear::ThreadPool do
   end
 
   before do
-    Thread.abort_on_exception = true
-
     @thread_count = 10
     @pool = IOTear::ThreadPool.new(@thread_count)
     @thread_names = pool.threads.collect { |thread| thread[:name] }

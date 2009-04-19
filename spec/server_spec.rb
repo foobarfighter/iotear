@@ -18,13 +18,17 @@ describe IOTear::Server do
   describe "#initialize" do
     it "creates a new TCPServer socket that listens on the expected_port" do
       server.socket.is_a?(TCPServer).should be_true
-      test_client = TestClient.new(expected_port)
+      test_client = TestClient.new(expected_port).connect
       test_client.should be_connected
       test_client.disconnect
     end
 
     it "intiailizes reactors as an empty hash" do
       server.reactors.should_not be_nil
+    end
+
+    it "initializes an empty clients array" do
+      server.clients.should be_empty
     end
   end
 

@@ -2,11 +2,12 @@ require 'socket'
 
 module IOTear
   class Server
-    attr_reader :socket, :reactors
+    attr_reader :socket, :reactors, :clients 
 
     def initialize(port, options = nil)
       @socket = TCPServer.new(port)
       @reactors = {}
+      @clients = []
     end
 
     def stop
