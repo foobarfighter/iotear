@@ -1,4 +1,5 @@
 require "#{File.dirname(__FILE__)}/server"
+require "#{File.dirname(__FILE__)}/selector"
 
 module IOTear
   class AsynchServer < Server

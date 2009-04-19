@@ -22,7 +22,10 @@ describe IOTear::AsynchServer do
     end
 
     after do
-      server.stop
+      begin
+        server.stop
+      rescue
+      end
     end
 
     describe "when there are no client sockets in the accept queue" do
@@ -67,8 +70,19 @@ describe IOTear::AsynchServer do
   end
 
   describe "#poll_read" do
+    attr_reader :server
+    before do
+      @server = IOTear::AsynchServer.new(expected_port)
+    end
+
+    after do
+      server.stop
+    end
+
     describe "when there are Clients" do
-      it "attempts a recv_nonblock on the current Client socket"
+      it "attempts a recv_nonblock on the current Client socket" do
+
+      end
       describe "when the recv_nonblock call throws an ReadNotReady state exception" do
         describe "when all Clients have been read" do
           it "does not attempt another recv_nonblock"
@@ -87,6 +101,16 @@ describe IOTear::AsynchServer do
         describe "when the message_block contains data" do
           it "writes the message_block to the Clients input buffer"
         end
+      end
+    end
+
+    describe "when there are no Clients" do
+      before do
+        server.clients.should be_empty
+      end
+      it "returns as soon as possible" do
+        pending
+        mock(server.reader_selector.current.recv_nonblock).times(0)
       end
     end
   end
