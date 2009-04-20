@@ -35,8 +35,22 @@ describe IOTear::Selector do
         selector.current_index.should == -1
       end
 
-      it "retrieves the first item in the Enumerable" do
-        selector.current == enumerable[selector.current_index]
+      describe "when the Enumerable is not empty" do
+        it "retrieves the first item in the Enumerable" do
+          selector.current == enumerable[selector.current_index]
+        end
+      end
+
+      describe "when the Enumerable is empty" do
+        before do
+          @enumerable = []
+          @selector = IOTear::Selector.new(enumerable)
+          selector.current_index.should == -1
+        end
+
+        it "returns nil" do
+          selector.current.should == nil
+        end
       end
     end
 

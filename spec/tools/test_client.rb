@@ -11,6 +11,7 @@ class TestClient
       @connected = true
     rescue Exception => e
       @connected = false
+      p e
     end
     self
   end
@@ -19,7 +20,13 @@ class TestClient
     @connected
   end
 
+  def write(message)
+    @socket.write(message)
+    sleep 0.1
+  end
+
   def disconnect
     @socket.close
+    sleep 0.1    
   end
 end

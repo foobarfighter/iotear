@@ -9,7 +9,7 @@ module IOTear
     end
 
     def current
-      @current_index == -1 ? get : @enumerable[@current_index]
+      @current_index == -1 ? @enumerable[0] : @enumerable[@current_index]
     end
 
     def get

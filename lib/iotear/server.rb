@@ -11,7 +11,7 @@ module IOTear
     end
 
     def stop
-      socket.close
+      socket.close #if socket.open?
     end
 
     def on_connect(&block)
