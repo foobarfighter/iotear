@@ -110,7 +110,7 @@ class NonBlockServer
     begin
       if @block_writer.nil? || @block_writer.finished?
         if client = clients.find { |client| client.writes_pending? }
-          @block_writer = BlockWriter.new(client, BLOCK_SIZE)
+          @block_writer = MessageWriter.new(client, BLOCK_SIZE)
           debug "writing block to #{client.uuid}"
         end
       end

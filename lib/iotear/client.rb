@@ -5,6 +5,19 @@ module IOTear
     def initialize(socket, sockaddr)
       @socket = socket
       @in_buffer = []
+      @out_buffer = []
+    end
+
+    def writes_pending?
+      @out_buffer.size > 0
+    end
+
+    def <<(block)
+      @out_buffer << block
+    end
+
+    def read_out
+      @out_buffer.shift if writes_pending?
     end
 
     def readable?

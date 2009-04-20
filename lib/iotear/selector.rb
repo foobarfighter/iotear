@@ -22,6 +22,14 @@ module IOTear
       current
     end
 
+    def find(&block)
+      found = false
+      begin
+        found = yield(get)
+      end while !found && !last?
+      found ? current : nil
+    end
+
     def last?
       @current_index == @enumerable.size - 1
     end

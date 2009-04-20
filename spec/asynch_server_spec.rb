@@ -21,6 +21,19 @@ describe IOTear::AsynchServer do
       server.reader_selector.enumerable.should == server.clients
       server.stop
     end
+
+    it "creates a new #writer_selector" do
+      server = IOTear::AsynchServer.new(expected_port)
+      server.writer_selector.should_not be_nil
+      server.writer_selector.enumerable.should == server.clients
+      server.stop
+    end
+
+    it "initializes a nil #message_writer" do
+      server = IOTear::AsynchServer.new(expected_port)
+      server.message_writer.should be_nil
+      server.stop
+    end
   end
 
   describe "#poll_accept" do
@@ -180,6 +193,45 @@ describe IOTear::AsynchServer do
       it "returns as soon as possible" do
         mock(server.reader_selector).get.times(0)
         server.poll_read
+      end
+    end
+  end
+
+  describe "#poll_write" do
+    attr_reader :server
+    before do
+      @server = IOTear::AsynchServer.new(expected_port)
+    end
+
+    after do
+      server.stop
+    end
+
+    describe "when there are Clients" do
+      before do
+        test_client.connect.should be_connected
+        server.poll_accept
+        server.clients.size.should == 1
+      end
+
+      describe "when a message is not currently being written" do
+        before do
+          server.message_writer.should be_nil
+        end
+
+        it "finds the first client that can write and creates a new MessageWriter" do
+          server.clients.first << "0"
+          server.poll_write
+          server.message_writer.should_not be_nil
+        end
+      end
+
+      describe "when a block is currently being written" do
+      end
+
+      it "uses write_nonblock on the Client sockets" do
+#        mock(server.reader_selector.current.socket).recv_nonblock(IOTear::AsynchServer::BLOCK_SIZE)
+        server.poll_write
       end
     end
   end

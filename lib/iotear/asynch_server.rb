@@ -1,15 +1,18 @@
 require "#{File.dirname(__FILE__)}/server"
 require "#{File.dirname(__FILE__)}/selector"
+require "#{File.dirname(__FILE__)}/message_writer"
 
 module IOTear
   class AsynchServer < Server
     BLOCK_SIZE = 1
 
-    attr_reader :reader_selector
+    attr_reader :reader_selector, :writer_selector, :message_writer
 
     def initialize(port, options = nil)
       super(port)
       @reader_selector = Selector.new(clients)
+      @writer_selector = Selector.new(clients)
+      @message_writer = nil
     end
 
     def run
@@ -42,6 +45,10 @@ module IOTear
     end
 
     def poll_write
+      if message_writer.nil? || message_writer.finished?    
+        @message_writer = writer_selector.find { |client| client.writes_pending? }
+#        @message_writer = clients.find { |client| client.writes_pending? }
+      end
     end
 
     def client_disconnected(client)

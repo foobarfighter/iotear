@@ -106,6 +106,34 @@ describe IOTear::Selector do
     end
   end
 
+  describe "#find" do
+    attr_reader :selector
+    before do
+      @selector = IOTear::Selector.new(enumerable)
+    end
+
+    it "calls #get for each iteration until it the block returns true" do
+      mock.proxy(selector).get.times(2)
+      selector.find { |item| item == 2 }
+    end
+
+    it "calls #get for each iteration until the search has been exhausted" do
+      mock.proxy(selector).get.times(enumerable.length)
+      selector.find { |item| false }
+    end
+
+    describe "when a match is previously found" do
+      before do
+        selector.find { |item| item == 2 }.should_not be_nil
+      end
+
+      it "begins the search at the last matched location" do
+        mock.proxy(selector).get
+        selector.find { |item| item == 3 }.should be_true
+      end
+    end
+  end
+
   describe "#last?" do
     attr_reader :selector
     before do
