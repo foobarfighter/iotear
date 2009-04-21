@@ -52,6 +52,7 @@ module IOTear
 
       if message_writer && !message_writer.finished?
         message_writer.send_nonblock
+        trigger(:deliver, message_writer.client, message_writer.block) if message_writer.finished?
       end
     end
 

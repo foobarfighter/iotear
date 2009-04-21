@@ -270,56 +270,24 @@ describe IOTear::AsynchServer do
               server.poll_write
               server.writer_selector.current.should == expected_client
             end
+          end
+        end
 
-            it "fires the :message reactor event" do
-              expected_message = "0" * IOTear::AsynchServer::BLOCK_SIZE
-              server.clients.first << expected_message
-              mock(server).trigger(:message, server.clients.first, expected_message)
-              server.poll_write
-              server.message_writer.should be_finished
-
-            end
+        describe "when a message is finished" do
+          it "fires the :deliver reactor event" do
+            server.clients.first << "0"
+            mock(server).trigger(:deliver, server.clients.first, "0")
+            server.poll_write
+            server.message_writer.should be_finished
           end
         end
 
       end
     end
   end
-#
-  #  describe "#poll_write" do
-  #    describe "when there is no currently active block being written" do
-  #      describe "when there is a Client that has a block to write" do
-  #        # acts as block_in_progress begin
-  #        it "trys to send some data to the Client"
-  #        describe "when the block is partially sent" do
-  #          it "fires the :partial_write reactor event"
-  #        end
-  #        describe "when the entire block is sent" do
-  #          it "fires the :block_success reactor event"
-  #          it "increments the writer_selector"
-  #        end
-  #        describe "when sending data is unsuccessful" do
-  #          it "increments the writer_selector"
-  #          describe "when the Client was disconnected" do
-  #            it "disconnects the Client"
-  #          end
-  #          describe "when the Client was not ready" do
-  #            it "increments the writer_selector"
-  #          end
-  #        end
-  #        # acts as block_in_progress end
-  #      end
-  #      describe "when no Client is found that has a block to write" do
-  #        it "increments the writer_selector"
-  #      end
-  #    end
-  #    describe "when there is an active block being written" do
-  #      it "acts as a block_in_progress"
-  #    end
-  #  end
-  #
-  #  describe "#disconnect" do
-  #    it "removes the unregisters the Client"
-  #    it "closes the Client's socket"
-  #  end
+
+    describe "#disconnect" do
+      it "removes the unregisters the Client"
+      it "closes the Client's socket"
+    end
 end
