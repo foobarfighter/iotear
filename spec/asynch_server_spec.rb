@@ -214,24 +214,65 @@ describe IOTear::AsynchServer do
         server.clients.size.should == 1
       end
 
-      describe "when a message is not currently being written" do
-        before do
-          server.message_writer.should be_nil
-        end
-
-        it "finds the first client that can write and creates a new MessageWriter" do
-          server.clients.first << "0"
-          server.poll_write
-          server.message_writer.should_not be_nil
-        end
-      end
-
-      describe "when a block is currently being written" do
-      end
-
       it "uses write_nonblock on the Client sockets" do
-#        mock(server.reader_selector.current.socket).recv_nonblock(IOTear::AsynchServer::BLOCK_SIZE)
+        message = "message"
+        expected_message_block = message[0, IOTear::AsynchServer::BLOCK_SIZE]
+        server.writer_selector.current << message
+        mock.proxy(server.writer_selector.current.socket).write_nonblock(expected_message_block)
         server.poll_write
+      end
+
+      context "message_processing" do
+
+        describe "when a message is not currently being written" do
+          before do
+            server.message_writer.should be_nil
+          end
+
+          it "finds the first client that can write and creates a new MessageWriter" do
+            server.clients.first << "0"
+            server.poll_write
+            server.message_writer.should_not be_nil
+          end
+        end
+
+        describe "when a message is currently being written" do
+          attr_reader :message_to_write
+          before do
+            TestClient.new(expected_port).connect.should be_connected
+            server.poll_accept
+            server.clients.size.should == 2
+            @message_to_write = "0" * IOTear::AsynchServer::BLOCK_SIZE * 3
+            server.clients.first << message_to_write
+            server.poll_write
+            server.message_writer.should_not be_nil
+            server.writer_selector.current.should == server.clients.first
+          end
+
+          it "finishes the write before moving on to the next Client" do
+            server.poll_write
+            server.writer_selector.current.should == server.clients.first
+          end
+
+          describe "when the write is finished" do
+            before do
+              server.poll_write
+              server.poll_write
+              server.message_writer.should be_finished
+              TestClient.new(expected_port).connect.should be_connected
+              server.poll_accept
+              server.clients.size.should == 3
+            end
+
+            it "should move on to the next Client" do
+              expected_client = server.clients[server.clients.size-1]
+              expected_client << message_to_write
+              server.poll_write
+              server.writer_selector.current.should == expected_client
+            end
+          end
+        end
+
       end
     end
   end

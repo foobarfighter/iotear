@@ -46,8 +46,12 @@ module IOTear
 
     def poll_write
       if message_writer.nil? || message_writer.finished?    
-        @message_writer = writer_selector.find { |client| client.writes_pending? }
-#        @message_writer = clients.find { |client| client.writes_pending? }
+        client = writer_selector.find { |client| client.writes_pending? }
+        @message_writer = MessageWriter.new(client, BLOCK_SIZE) unless client.nil?
+      end
+
+      if message_writer && !message_writer.finished?
+        message_writer.send_nonblock
       end
     end
 
