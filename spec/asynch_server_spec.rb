@@ -316,6 +316,20 @@ describe IOTear::AsynchServer do
       server.clients.size.should == 2
       server.clients.find { |client| client == expected_client }.should be_nil
     end
+  end
 
+  describe "#run" do
+    attr_reader :server
+    before do
+      @server = IOTear::AsynchServer.new(expected_port)
+    end
+
+    it "calls poll_accept, poll_read and poll_write" do
+      mock(server).poll_accept
+      mock(server).poll_read
+      stub(server).poll_write { raise "expected test error" }
+
+      lambda { server.run }.should raise_error("expected test error")
+    end
   end
 end

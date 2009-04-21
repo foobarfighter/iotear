@@ -16,6 +16,12 @@ module IOTear
     end
 
     def run
+      while true
+        poll_accept
+        poll_read
+        poll_write
+        sleep 0.001
+      end
     end
 
     def poll_accept
