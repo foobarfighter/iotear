@@ -270,6 +270,15 @@ describe IOTear::AsynchServer do
               server.poll_write
               server.writer_selector.current.should == expected_client
             end
+
+            it "fires the :message reactor event" do
+              expected_message = "0" * IOTear::AsynchServer::BLOCK_SIZE
+              server.clients.first << expected_message
+              mock(server).trigger(:message, server.clients.first, expected_message)
+              server.poll_write
+              server.message_writer.should be_finished
+
+            end
           end
         end
 
