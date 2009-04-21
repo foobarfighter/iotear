@@ -45,7 +45,9 @@ module IOTear
     end
 
     def poll_write
-      if message_writer.nil? || message_writer.finished?    
+      return unless clients.size > 0
+      
+      if message_writer.nil? || message_writer.finished?
         client = writer_selector.find { |client| client.writes_pending? }
         @message_writer = MessageWriter.new(client, BLOCK_SIZE) unless client.nil?
       end
@@ -56,7 +58,9 @@ module IOTear
       end
     end
 
-    def client_disconnected(client)
+    def client_disconnected(disconnect_client)
+      disconnect_client.socket.close
+      clients.delete_if { |client| client == disconnect_client }
     end
   end
 end

@@ -284,10 +284,38 @@ describe IOTear::AsynchServer do
 
       end
     end
+
+    describe "when there are no Clients" do
+      before do
+        server.clients.should be_empty
+      end
+      
+      it "returns as soon as possible" do
+        mock(server.writer_selector).find(anything).times(0)
+      end
+    end
   end
 
-    describe "#disconnect" do
-      it "removes the unregisters the Client"
-      it "closes the Client's socket"
+  describe "#client_disconnected" do
+    attr_reader :server, :expected_client
+    before do
+      @server = IOTear::AsynchServer.new(expected_port)
+
+      test_client.connect.should be_connected
+      server.poll_accept
+      TestClient.new(expected_port).connect.should be_connected
+      server.poll_accept
+      TestClient.new(expected_port).connect.should be_connected
+      server.poll_accept
+      server.clients.size.should == 3
+      @expected_client = server.clients.first
     end
+
+    it "removes and unregisters the Client" do
+      server.client_disconnected(expected_client)
+      server.clients.size.should == 2
+      server.clients.find { |client| client == expected_client }.should be_nil
+    end
+
+  end
 end
